@@ -1,6 +1,5 @@
 Kompetenzteam
 
-
 <!doctype html>
 <html lang="de">
 <head>
@@ -18,7 +17,7 @@ Kompetenzteam
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
     label { display: grid; gap: 6px; font-size: 13px; color: #333; }
-    input, textarea {
+    input, textarea, select {
       border: 1px solid #d7dbe2; border-radius: 10px; padding: 10px 12px;
       font-size: 14px; outline: none; background: #fff;
       transition: border-color .15s, box-shadow .15s;
@@ -27,7 +26,7 @@ Kompetenzteam
 
     /* Pflichtfeld-Markierung */
     .requiredHint { font-size: 12px; color: #6b7280; }
-    .fieldError input, .fieldError textarea{
+    .fieldError input, .fieldError textarea, .fieldError select{
       border-color: #ef4444 !important;
       box-shadow: 0 0 0 3px rgba(239, 68, 68, .15);
     }
@@ -48,7 +47,7 @@ Kompetenzteam
       border-radius: 999px;
       width: fit-content;
     }
-    .optionalField input, .optionalField textarea{
+    .optionalField input, .optionalField textarea, .optionalField select{
       border-color: rgba(245, 158, 11, .65);
       box-shadow: 0 0 0 3px rgba(245, 158, 11, .12);
     }
@@ -58,7 +57,6 @@ Kompetenzteam
       border: 0; border-radius: 10px; padding: 10px 14px; font-weight: 600; cursor: pointer;
       background: #111827; color: white;
     }
-    button.secondary { background: #e5e7eb; color: #111827; }
     button.success { background: #16a34a; }
     button.success:disabled { opacity: .6; cursor: not-allowed; }
 
@@ -93,6 +91,26 @@ Kompetenzteam
     }
 
     @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+
+    /* Kleine Hilfe: Richtung-Wahl kompakt */
+    .dirRow{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .dirPill{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border: 1px solid #d7dbe2;
+      border-radius: 999px;
+      background:#fff;
+      cursor:pointer;
+      user-select:none;
+    }
+    .dirPill input{ margin:0; }
   </style>
 </head>
 <body>
@@ -125,10 +143,26 @@ Kompetenzteam
           <span class="requiredHint">&nbsp;</span>
         </label>
 
+        <!-- ORT + FAHRTRICHTUNG -->
         <label>
           Ort / Einsatzgebiet
-          <input id="location" type="text" value="Jägerjob Strasse, 1077 PLZ" />
-          <span class="requiredHint">&nbsp;</span>
+          <input id="locationBase" type="text" value="Jägerjob Strasse, 1077 PLZ" />
+          <span class="requiredHint">Fahrtrichtung wird automatisch angehängt.</span>
+        </label>
+
+        <label class="optionalField">
+          Fahrtrichtung <span class="optionalHint">Optional</span>
+          <div class="dirRow">
+            <label class="dirPill" title="Fahrtrichtung Norden">
+              <input type="radio" name="direction" id="dirNorth" value="Norden">
+              Norden
+            </label>
+            <label class="dirPill" title="Fahrtrichtung Süden">
+              <input type="radio" name="direction" id="dirSouth" value="Süden">
+              Süden
+            </label>
+          </div>
+          <span class="requiredHint">Wenn keine Auswahl, wird keine Fahrtrichtung angezeigt.</span>
         </label>
 
         <label id="wrapLimit">
@@ -212,7 +246,6 @@ Das Fahrzeug wurde visuell eindeutig identifiziert.</textarea>
       const secs = pad2(d.getSeconds());
 
       document.getElementById("date").value = `${day}.${month}.${year}`;
-      // Sekundengenau, damit es "live" sichtbar ist
       document.getElementById("time").value = `${hours}:${mins}:${secs} Uhr`;
     }
 
@@ -224,7 +257,6 @@ Das Fahrzeug wurde visuell eindeutig identifiziert.</textarea>
     }
 
     function fmtMoneyUSD(n){
-      // 15000 -> 15.000$
       const s = Math.round(n).toString();
       return s.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " $";
     }
@@ -250,11 +282,27 @@ Das Fahrzeug wurde visuell eindeutig identifiziert.</textarea>
       document.body.removeChild(ta);
     }
 
+    function getDirectionText(){
+      const north = document.getElementById("dirNorth").checked;
+      const south = document.getElementById("dirSouth").checked;
+      if (north) return "Fahrtrichtung: Norden";
+      if (south) return "Fahrtrichtung: Süden";
+      return "";
+    }
+
+    function getLocationWithDirection(){
+      const base = document.getElementById("locationBase").value.trim();
+      const dir = getDirectionText();
+      if (!dir) return base;
+      // “Jägerjob Strasse, 1077 PLZ (Fahrtrichtung Norden)”
+      return `${base} (${dir})`;
+    }
+
     function generate() {
       const date = document.getElementById("date").value.trim();
       const time = document.getElementById("time").value.trim();
 
-      const location = document.getElementById("location").value.trim();
+      const location = getLocationWithDirection();
       const limit = numberOrNull("limit");
       const measured = numberOrNull("measured");
       const tolerance = numberOrNull("tolerance");
@@ -266,7 +314,7 @@ Das Fahrzeug wurde visuell eindeutig identifiziert.</textarea>
       const officer = document.getElementById("officer").value.trim();
       const method = document.getElementById("method").value.trim();
 
-      // Pflichtfelder (Kennzeichen ist NICHT Pflicht)
+      // Pflichtfelder
       const errMeasured = (measured === null);
       const errFine = (fine === null);
       const errLimit = (limit === null);
@@ -317,26 +365,27 @@ Es bestand freie Sicht auf das gemessene Fahrzeug ohne Zwischenverkehr oder Stö
 `;
       }
 
+      const paragraphLine = `§ 2 Abs. 07 StVO - ${date}`;
+
       const text =
 `⭐ NARCO COUNTY SHERIFF DEPARTMENT ⭐
 
 〚 DATEN ZUM VERSTOSS 〛
-
 Datum: ${date}
 
 Uhrzeit: ${time}
 Ort: ${location}
 
-*Im betroffenen Streckenabschnitt gilt eine zulässige Höchstgeschwindigkeit von ${limit} km/h.*
+Im betroffenen Streckenabschnitt gilt eine zulässige Höchstgeschwindigkeit von ${limit} km/h.
 
 〚 MESSVERFAHREN 〛
 ${method}
 
 〚 MESSDATEN 〛
-Gemessene Geschwindigkeit: **${measured} km/h**
-Gesetzlicher Toleranzabzug: **${tolerance} km/h**
-Verwertbare Geschwindigkeit: **${usable} km/h**
-Tatsächliche Überschreitung: **${over} km/h**
+Gemessene Geschwindigkeit: ${measured} km/h
+Gesetzlicher Toleranzabzug: ${tolerance} km/h
+Verwertbare Geschwindigkeit: ${usable} km/h
+Tatsächliche Überschreitung: ${over} km/h
 
 ${vehicleBlock}〚 RECHTSFOLGE 〛
 Gemäß dem geltenden Bußgeldkatalog vom Staat wird folgende Maßnahme verhängt: 
@@ -344,7 +393,9 @@ Gemäß dem geltenden Bußgeldkatalog vom Staat wird folgende Maßnahme verhäng
 ⠂ Zusätzliche Maßnahmen: Keine
 
 〚 GEZEICHNET VON 〛
-${officer}`;
+${officer}
+
+${paragraphLine}`;
 
       document.getElementById("output").textContent = text;
 
@@ -377,8 +428,11 @@ ${officer}`;
     });
 
     // Live-Update (Inputs)
-    ["location","limit","measured","tolerance","plate","holder","fine","officer","method"]
+    ["locationBase","limit","measured","tolerance","plate","holder","fine","officer","method","dirNorth","dirSouth"]
       .forEach(id => document.getElementById(id).addEventListener("input", generate));
+
+    // Radio-Buttons trigger change event, too
+    ["dirNorth","dirSouth"].forEach(id => document.getElementById(id).addEventListener("change", generate));
   </script>
 </body>
 </html>
